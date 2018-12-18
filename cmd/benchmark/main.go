@@ -52,7 +52,7 @@ func parseInputParams() {
 	pflag.IntVarP(&repetitions, "repetitions", "r", 1, "repetitions for one user")
 	pflag.StringVarP(&rootmemberkeys, "rootmemberkeys", "k", "", "path to file with RootMember keys")
 	pflag.StringVarP(&apiurl, "apiurl", "u", "http://localhost:19191/api", "url to api")
-	pflag.StringVarP(&loglevel, "loglevel", "l", "info", "log level for benchmark")
+	pflag.StringVarP(&loglevel, "loglevel", "l", "warn", "log level for benchmark")
 	pflag.Parse()
 }
 

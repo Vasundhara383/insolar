@@ -24,5 +24,5 @@ type Log struct {
 
 // NewLog creates new default configuration for logging
 func NewLog() Log {
-	return Log{Level: "Info", Adapter: "logrus"}
+	return Log{Level: "warn", Adapter: "logrus"}
 }
