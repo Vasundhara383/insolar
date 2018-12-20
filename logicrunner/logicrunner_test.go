@@ -70,7 +70,7 @@ var parallel = false
 
 func TestMain(m *testing.M) {
 	var err error
-	err = log.SetLevel("Debug")
+	err = log.SetLevel("warn")
 	if err != nil {
 		log.Errorln(err.Error())
 	}

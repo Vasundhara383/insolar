@@ -47,7 +47,7 @@ func main() {
 
 	pflag.Parse()
 
-	err := log.SetLevel("Debug")
+	err := log.SetLevel("warn")
 	if err != nil {
 		log.Errorln(err.Error())
 	}

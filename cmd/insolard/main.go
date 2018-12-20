@@ -179,7 +179,7 @@ func initLogger(ctx context.Context, cfg configuration.Log, traceid string) (con
 	if err != nil {
 		panic(err)
 	}
-	err = inslog.SetLevel(cfg.Level)
+	err = inslog.SetLevel("warn")
 	if err != nil {
 		inslog.Errorln(err.Error())
 	}

@@ -37,7 +37,7 @@ func NewLog(cfg configuration.Log) (core.Logger, error) {
 		return nil, errors.New("invalid logger config")
 	}
 
-	err := logger.SetLevel(cfg.Level)
+	err := logger.SetLevel("warn")
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid logger config")
 	}
@@ -63,7 +63,7 @@ func SetGlobalLogger(logger core.Logger) {
 
 // SetLevel lets log level for global logger
 func SetLevel(level string) error {
-	return GlobalLogger.SetLevel(level)
+	return GlobalLogger.SetLevel("warn")
 }
 
 // GetLevel lets log level for global logger

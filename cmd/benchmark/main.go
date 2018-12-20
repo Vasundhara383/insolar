@@ -179,7 +179,7 @@ func startScenario(s scenario) {
 func main() {
 	parseInputParams()
 
-	err := log.SetLevel(loglevel)
+	err := log.SetLevel("warn")
 	check(fmt.Sprintf("can not set '%s' level on logger:", loglevel), err)
 
 	out, err := chooseOutput(output)
