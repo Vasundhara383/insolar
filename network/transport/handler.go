@@ -55,7 +55,7 @@ func (ph *packetHandlerImpl) processResponse(ctx context.Context, msg *packet.Pa
 
 	logger.Debugf("[ processResponse ] Process response %s with RequestID = %d", msg.RemoteAddress, msg.RequestID)
 
-	future := ph.futureManager.Get(msg)
+	future := ph.futureManager.Get(Sequence(msg.RequestID))
 	if future != nil {
 		if shouldProcessPacket(future, msg) {
 			logger.Debugf("[ processResponse ] Processing future with RequestID = %s", msg.RequestID)

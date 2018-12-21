@@ -93,7 +93,7 @@ func (t *udpTransport) send(recvAddress string, data []byte) error {
 	}
 
 	// TODO: may be try to send second time if error
-	// TODO: skip resolving every time by caching result
+	// TODO: skip resolving every time by caching resultChan
 	udpAddr, err := net.ResolveUDPAddr("udp", recvAddress)
 	if err != nil {
 		return errors.Wrap(err, "udpTransport.send")

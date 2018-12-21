@@ -24,6 +24,10 @@ import (
 
 type Sequence uint64
 
+type futureID int
+
+const FutureID = futureID(1)
+
 type sequenceGenerator interface {
 	Generate() Sequence
 }
@@ -33,8 +37,8 @@ func newSequenceGenerator() sequenceGenerator {
 }
 
 type futureManager interface {
-	Get(msg *packet.Packet) Future
-	Create(msg *packet.Packet) Future
+	Get(id Sequence) Future
+	Create(ctx context.Context, callback RunCallback) Future
 }
 
 func newFutureManager() futureManager {

@@ -123,7 +123,7 @@ func (d *distributor) pingHost(ctx context.Context, host *host.Host) error {
 	}
 
 	logger.Debugf("before ping request")
-	result, err := pingCall.GetResult(d.pingRequestTimeout)
+	result, err := pingCall.ResultUntil(d.pingRequestTimeout)
 	if err != nil {
 		logger.Error(err)
 		return errors.Wrap(err, "[ pingHost ] failed to get ping result")
@@ -157,7 +157,7 @@ func (d *distributor) getRandomHosts(ctx context.Context, host *host.Host) ([]ho
 		return nil, errors.Wrap(err, "[ getRandomHosts ] failed to send getRandomHosts request")
 	}
 
-	result, err := call.GetResult(d.randomHostsRequestTimeout)
+	result, err := call.ResultUntil(d.randomHostsRequestTimeout)
 	if err != nil {
 		logger.Error(err)
 		return nil, errors.Wrap(err, "[ getRandomHosts ] failed to get getRandomHosts result")
@@ -204,7 +204,7 @@ func (d *distributor) sendPulseToHost(ctx context.Context, pulse *core.Pulse, ho
 	if err != nil {
 		return err
 	}
-	result, err := call.GetResult(d.pulseRequestTimeout)
+	result, err := call.ResultUntil(d.pulseRequestTimeout)
 	if err != nil {
 		return err
 	}

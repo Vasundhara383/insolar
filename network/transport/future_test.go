@@ -87,12 +87,12 @@ func TestFuture_SetResult(t *testing.T) {
 
 	go f.SetResult(m)
 
-	m3, err := f.GetResult(10 * time.Millisecond)
+	m3, err := f.ResultUntil(10 * time.Millisecond)
 	require.NoError(t, err)
 	require.Equal(t, m, m3)
 
-	// no result, timeout
-	_, err = f.GetResult(10 * time.Millisecond)
+	// no resultChan, timeout
+	_, err = f.ResultUntil(10 * time.Millisecond)
 	require.Error(t, err)
 }
 
@@ -127,7 +127,7 @@ func TestFuture_GetResult(t *testing.T) {
 		f.Cancel()
 	}()
 
-	_, err := f.GetResult(10 * time.Millisecond)
+	_, err := f.ResultUntil(10 * time.Millisecond)
 	require.Error(t, err)
 	require.Equal(t, uint32(1), atomic.LoadUint32(&cancelled))
 }
@@ -136,7 +136,7 @@ func TestFuture_GetResult2(t *testing.T) {
 	n, _ := host.NewHost("127.0.0.1:8080")
 	c := make(chan *packet.Packet)
 	var f Future = &future{
-		result:         c,
+		resultChan:     c,
 		actor:          n,
 		request:        &packet.Packet{},
 		requestID:      packet.RequestID(1),
@@ -146,6 +146,6 @@ func TestFuture_GetResult2(t *testing.T) {
 		time.Sleep(time.Millisecond)
 		close(c)
 	}()
-	_, err := f.GetResult(10 * time.Millisecond)
+	_, err := f.ResultUntil(10 * time.Millisecond)
 	require.Error(t, err)
 }

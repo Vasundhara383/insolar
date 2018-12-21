@@ -17,43 +17,47 @@
 package transport
 
 import (
+	"context"
 	"sync"
-
-	"github.com/insolar/insolar/network/transport/packet"
 )
 
 type futureManagerImpl struct {
 	mutex   sync.RWMutex
-	futures map[packet.RequestID]Future
+	futures map[Sequence]Future
+
+	sequenceGenerator sequenceGenerator
 }
 
 func newFutureManagerImpl() *futureManagerImpl {
 	return &futureManagerImpl{
-		futures: make(map[packet.RequestID]Future),
+		futures:           make(map[Sequence]Future),
+		sequenceGenerator: newSequenceGenerator(),
 	}
 }
 
-func (fm *futureManagerImpl) Create(msg *packet.Packet) Future {
-	future := NewFuture(msg.RequestID, msg.Receiver, msg, func(f Future) {
-		fm.delete(f.ID())
-	})
-
+func (fm *futureManagerImpl) Create(ctx context.Context, callback RunCallback) Future {
 	fm.mutex.Lock()
 	defer fm.mutex.Unlock()
 
-	fm.futures[msg.RequestID] = future
+	id := fm.sequenceGenerator.Generate()
+	futureCtx := context.WithValue(ctx, FutureID, Sequence(id))
 
+	future := NewFuture(futureCtx, callback, func(ctx context.Context) {
+		fm.delete(ctx.Value(FutureID).(Sequence))
+	})
+
+	fm.futures[id] = future
 	return future
 }
 
-func (fm *futureManagerImpl) Get(msg *packet.Packet) Future {
+func (fm *futureManagerImpl) Get(id Sequence) Future {
 	fm.mutex.RLock()
 	defer fm.mutex.RUnlock()
 
-	return fm.futures[msg.RequestID]
+	return fm.futures[id]
 }
 
-func (fm *futureManagerImpl) delete(id packet.RequestID) {
+func (fm *futureManagerImpl) delete(id Sequence) {
 	fm.mutex.Lock()
 	defer fm.mutex.Unlock()
 

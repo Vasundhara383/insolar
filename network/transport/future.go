@@ -17,12 +17,12 @@
 package transport
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
 	"time"
 
-	"github.com/insolar/insolar/network/transport/host"
-	"github.com/insolar/insolar/network/transport/packet"
+	"github.com/insolar/insolar/instrumentation/inslogger"
 )
 
 var (
@@ -30,99 +30,118 @@ var (
 	ErrTimeout = errors.New("timeout")
 	// ErrChannelClosed is returned when the input channel is closed.
 	ErrChannelClosed = errors.New("channel closed")
+	// ErrChannelClosed is returned when the input channel is closed.
+	ErrCancelled = errors.New("cancelled")
 )
+
+type Result interface{}
+
+// CancelCallback is a callback function executed when cancelling Future.
+type CancelCallback func(ctx context.Context)
+type RunCallback func(context.Context) (Result, error)
 
 // Future is network response future.
 type Future interface {
+	// Result is a channel to listen for future resultChan.
+	Result() <-chan Result
+	Error() <-chan error
 
-	// ID returns packet sequence number.
-	ID() packet.RequestID
-
-	// Actor returns the initiator of the packet.
-	Actor() *host.Host
-
-	// Request returns origin request.
-	Request() *packet.Packet
-
-	// Result is a channel to listen for future result.
-	Result() <-chan *packet.Packet
-
-	// SetResult makes packet to appear in result channel.
-	SetResult(*packet.Packet)
-
-	// GetResult gets the future result from Result() channel with a timeout set to `duration`.
-	GetResult(duration time.Duration) (*packet.Packet, error)
+	// WaitUntil gets the future resultChan from Result() channel with a timeout set to `duration`.
+	WaitUntil(duration time.Duration) (Result, error)
 
 	// Cancel closes all channels and cleans up underlying structures.
-	Cancel()
+	Cancel(ctx context.Context)
 }
 
-// CancelCallback is a callback function executed when cancelling Future.
-type CancelCallback func(Future)
-
 type future struct {
-	result         chan *packet.Packet
-	actor          *host.Host
-	request        *packet.Packet
-	requestID      packet.RequestID
+	ctx context.Context
+
+	resultChan chan Result
+	errorChan  chan error
+
+	runCallback    RunCallback
 	cancelCallback CancelCallback
-	canceled       uint32
+
+	canceled uint32
 }
 
 // NewFuture creates new Future.
-func NewFuture(requestID packet.RequestID, actor *host.Host, msg *packet.Packet, cancelCallback CancelCallback) Future {
-	return &future{
-		result:         make(chan *packet.Packet, 1),
-		actor:          actor,
-		request:        msg,
-		requestID:      requestID,
+func NewFuture(ctx context.Context, runCallback RunCallback, cancelCallback CancelCallback) Future {
+	future := &future{
+		ctx:        ctx,
+		resultChan: make(chan Result, 1),
+		errorChan:  make(chan error, 1),
+
+		runCallback:    runCallback,
 		cancelCallback: cancelCallback,
+	}
+
+	go future.run()
+	return future
+}
+
+func (future *future) run() {
+	result, err := future.runCallback(future.ctx)
+	future.setResult(result, err)
+	future.Cancel(future.ctx)
+}
+
+func (future *future) setResult(result Result, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			inslogger.FromContext(future.ctx).Debug("Caught panic on write future result. Possible future close in another context")
+		}
+	}()
+
+	if err != nil {
+		future.errorChan <- err
+	} else {
+		future.resultChan <- result
 	}
 }
 
-// ID returns RequestID of packet.
-func (future *future) ID() packet.RequestID {
-	return future.requestID
-}
-
-// Actor returns Host address that was used to create packet.
-func (future *future) Actor() *host.Host {
-	return future.actor
-}
-
-// Request returns original request packet.
-func (future *future) Request() *packet.Packet {
-	return future.request
-}
-
-// Result returns result packet channel.
-func (future *future) Result() <-chan *packet.Packet {
-	return future.result
-}
-
-// SetResult write packet to the result channel.
-func (future *future) SetResult(msg *packet.Packet) {
-	future.result <- msg
-}
-
-// GetResult gets the future result from Result() channel with a timeout set to `duration`.
-func (future *future) GetResult(duration time.Duration) (*packet.Packet, error) {
-	select {
-	case result, ok := <-future.Result():
-		if !ok {
-			return nil, ErrChannelClosed
+func (future *future) checkResultError(result Result, err error, ok bool) (Result, error) {
+	if !ok {
+		if atomic.LoadUint32(&future.canceled) == 1 {
+			return nil, ErrCancelled
 		}
-		return result, nil
+
+		return nil, ErrChannelClosed
+	}
+	future.Cancel(future.ctx)
+	return result, nil
+}
+
+// Result returns resultChan packet channel.
+func (future *future) Result() <-chan Result {
+	return future.resultChan
+}
+
+func (future *future) Error() <-chan error {
+	return future.errorChan
+}
+
+// WaitUntil gets the future resultChan from Result() channel with a timeout set to `duration`.
+func (future *future) WaitUntil(duration time.Duration) (Result, error) {
+	select {
+	case result, ok := <-future.resultChan:
+		return future.checkResultError(result, nil, ok)
+	case err, ok := <-future.errorChan:
+		return future.checkResultError(nil, err, ok)
 	case <-time.After(duration):
-		future.Cancel()
 		return nil, ErrTimeout
 	}
 }
 
 // Cancel allows to cancel Future processing.
-func (future *future) Cancel() {
+func (future *future) Cancel(ctx context.Context) {
 	if atomic.CompareAndSwapUint32(&future.canceled, 0, 1) {
-		close(future.result)
-		future.cancelCallback(future)
+		if future.ctx != ctx {
+			inslogger.FromContext(ctx).Debug("Future cancelled from other context")
+		}
+
+		close(future.resultChan)
+		close(future.errorChan)
+		future.cancelCallback(future.ctx)
 	}
 }
